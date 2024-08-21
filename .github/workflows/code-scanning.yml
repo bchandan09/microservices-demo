@@ -1,0 +1,123 @@
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  analyze-go:
+    name: Analyze Go Services
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        service: [frontend, productcatalogservice, shippingservice, checkoutservice]
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v3
+
+    - name: Set up Go
+      uses: actions/setup-go@v4
+      with:
+        go-version: '1.19'
+
+    - name: Run Go Static Analysis
+      run: |
+        go vet ./src/${{ matrix.service }}/...
+        golangci-lint run ./src/${{ matrix.service }}/...
+
+  analyze-csharp:
+    name: Analyze C# Service
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v3
+
+    - name: Set up .NET
+      uses: actions/setup-dotnet@v3
+      with:
+        dotnet-version: '6.0.x'
+
+    - name: Install Dependencies
+      run: dotnet restore ./src/cartservice/
+
+    - name: Run Static Code Analysis
+      run: dotnet build ./src/cartservice/ --no-restore --configuration Release
+
+    - name: Run Code Analysis with SonarScanner
+      uses: SonarSource/sonarcloud-github-action@master
+      with:
+        projectBaseDir: ./src/cartservice/
+        args: >
+          -Dsonar.cs.opencover.reportsPaths=./src/cartservice/coverage.opencover.xml
+          -Dsonar.verbose=true
+
+  analyze-nodejs:
+    name: Analyze Node.js Services
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        service: [currencyservice, paymentservice]
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v3
+
+    - name: Set up Node.js
+      uses: actions/setup-node@v3
+      with:
+        node-version: '16'
+
+    - name: Install Dependencies
+      run: npm install --prefix ./src/${{ matrix.service }}
+
+    - name: Run ESLint for JavaScript/Node.js
+      run: npm run lint --prefix ./src/${{ matrix.service }}
+
+    - name: Run Security Analysis with npm-audit
+      run: npm audit --prefix ./src/${{ matrix.service }}
+
+  analyze-python:
+    name: Analyze Python Services
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        service: [emailservice, recommendationservice, loadgenerator]
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v3
+
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.x'
+
+    - name: Install Dependencies
+      run: pip install -r ./src/${{ matrix.service }}/requirements.txt
+
+    - name: Run Bandit Security Scan
+      run: bandit -r ./src/${{ matrix.service }}
+
+  analyze-java:
+    name: Analyze Java Service
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v3
+
+    - name: Set up JDK
+      uses: actions/setup-java@v3
+      with:
+        java-version: '11'
+
+    - name: Install Dependencies
+      run: mvn install -f ./src/adservice/pom.xml
+
+    - name: Run Static Code Analysis
+      run: mvn checkstyle:check -f ./src/adservice/pom.xml
+
+    - name: Run Security Analysis with OWASP Dependency Check
+      run: mvn org.owasp:dependency-check-maven:check -f ./src/adservice/pom.xml
